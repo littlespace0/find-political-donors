@@ -15,6 +15,11 @@ import java.util.TreeMap;
 
 public class Donors {
 	class medianStream{
+	   /** This class is used to compute the running median
+		 * of the money from the same zip to the same recipient.
+		 * Using a minHeap and a maxHeap to fast compute the 
+		 * median in O(1). To maintain the structure, insert
+		 * element is O(logN). */
 		PriorityQueue<Integer> minHeap;
 		PriorityQueue<Integer> maxHeap;
 		int transactions;
@@ -41,14 +46,22 @@ public class Donors {
 	}
 	
 	class Recipient{
+	   /** The recipient class has its ID and two maps.
+		 * dollarByDate has date as key and a list of transactions
+		 * on that day as value. 
+		 * dollarByZip has zip code as key and its median calculator
+		 * medianStream as value.
+		 * dollarByDate is a TreeMap for sorting.
+		 * */
 		String CMTE_ID;
-		TreeMap<String, List<Integer>> dollarByDate;
+		TreeMap<String, ArrayList<Integer>> dollarByDate;
 		HashMap<String, medianStream> dollarByZip;
 		public Recipient(String s){
 			CMTE_ID=s;
 			dollarByDate=new TreeMap<>(dateComparator);
 			dollarByZip=new HashMap<>();
 		}
+		/** sort by date */
 		Comparator<String> dateComparator=new Comparator<String>(){
 			public int compare(String s1, String s2){
 				int tmp=s1.substring(4, 8).compareTo(s2.substring(4, 8));
@@ -56,6 +69,7 @@ public class Donors {
 				return s1.substring(0, 4).compareTo(s2.substring(0, 4));
 			}
 		};
+		/** receive donation info, record the donation by zip and date if valid */
 		public void getDonations(String zip, String date, int amount, 
 				boolean computeZip, boolean computeDate){
 			if(computeZip){
@@ -65,18 +79,20 @@ public class Donors {
 			}
 			if(computeDate){
 				if(!dollarByDate.containsKey(date))
-					dollarByDate.put(date, new ArrayList<>());
+					dollarByDate.put(date, new ArrayList<Integer>());
 				dollarByDate.get(date).add(amount);
 			}
 		}
 	}
 	
+	/** A TreeMap sort the recipients by IDs */
 	TreeMap<String, Recipient> map;
 	
 	public Donors(){
 		map=new TreeMap<>();
 	}
 	
+	/** Input itcont from file, compute the running median and output to zip file */
 	public void dataInput(String filename1, String filename2){
 		try{
 			BufferedReader br=new BufferedReader(new FileReader(filename1));
@@ -87,19 +103,25 @@ public class Donors {
 				boolean computeDate=true;
 				String[] sarr=line.split("\\|");
 				
+				// CMTE_ID, skip if empty
 				String cmteID=sarr[0];
 				if(cmteID.length()==0) continue;
 				
+				// zip code, skip for zip record if invalid
+				// keep first 5 digits
 				String zip=sarr[10];
 				if(zip.length()<5) computeZip=false;
 				else if(zip.length()>5) zip=zip.substring(0, 5);
 				
+				// date, skip for date record if invalid
 				String date=sarr[13];
 				if(!isValidDate(date)) computeDate=false;
 				
+				// donation amount, skip if empty
 				String amt=sarr[14];
 				if(amt.length()==0) continue;
 				
+				// other, skip if not empty
 				if(sarr[15].length()!=0) continue;
 				
 				addInData(cmteID, zip, date, amt, computeZip, computeDate);
@@ -117,17 +139,22 @@ public class Donors {
 			e.printStackTrace();
 		}
 	}
-
+	
+	/** compute and write the median by date to file. Two methods are used. Direct
+	 * sort and find median, O(NlogN). QuickSelect, average O(N), worst O(N^2). In
+	 * test from FEC data, since for a particular recipient, the transactions per day
+	 * is not large, direct sort performs better and is used by default. But quickSelect
+	 * method is also provided. */
 	public void outputDate(String filename){
 		try{
 			BufferedWriter bw=new BufferedWriter(new FileWriter(filename));
 			for(Recipient rp:map.values()){
-				for(Map.Entry<String, List<Integer>> entry:rp.dollarByDate.entrySet()){
+				for(Map.Entry<String, ArrayList<Integer>> entry:rp.dollarByDate.entrySet()){
 					String date=entry.getKey();
 					List<Integer> ls=entry.getValue();
 					int median=0, sum=0, size=ls.size();;
-					//median=computeMedian(ls);
-					Collections.sort(ls);
+					//median=computeMedian(ls); // quickSelect
+					Collections.sort(ls); // direct sort
 					if(size%2==0)
 						median=(int)Math.round((ls.get(size/2-1)+ls.get(size/2))/2.0);
 					else
@@ -144,6 +171,7 @@ public class Donors {
 		}
 	}
 	
+	/** blocks of implementation of quickSelect to get median */
 	/*private int computeMedian(List<Integer> list){
 		if(list.size()==1) return list.get(0);
 		int n=list.size(), k=n/2;
@@ -187,6 +215,7 @@ public class Donors {
 		rp.getDonations(zip, date, Integer.parseInt(amt), computeZip, computeDate);
 	}
 	
+	/** roughly check if date is valid. */
 	private boolean isValidDate(String s){
 		if(s.length()!=8) return false;
 		for(char c:s.toCharArray()){
